@@ -11,6 +11,7 @@ void main() {
 
   test('insertClientLocally adds a record to the database', () async {
     final service = LocalQueueService(inMemory: true);
+    await service.clear();
     await service.insertClientLocally({
       'id': 'test-123',
       'name': 'Alice',
@@ -21,11 +22,13 @@ void main() {
     });
 
     final clients = await service.getUnsyncedClients();
-    expect(clients.any((c) => c['name'] == 'Alice'), true);
+    expect(clients.length, 1);
+    expect(clients[0]['name'], 'Alice');
   });
 
   test('markClientAsSynced marks record as synced', () async {
     final service = LocalQueueService(inMemory: true);
+    await service.clear();
     await service.insertClientLocally({
       'id': 'test-456',
       'name': 'Bob',
@@ -37,7 +40,7 @@ void main() {
 
     await service.markClientAsSynced('test-456');
     final unsynced = await service.getUnsyncedClients();
-    expect(unsynced.any((c) => c['id'] == 'test-456'), false);
+    expect(unsynced.length, 0);
 
     final all = await service.getClients();
     final bob = all.firstWhere((c) => c['id'] == 'test-456');
