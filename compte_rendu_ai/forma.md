@@ -1,28 +1,41 @@
-# AI Assistance Note
+# Compte Rendu - Assistance Intelligence Artificielle (IA)
+## Atelier 5 : Application de File d'Attente Offline-First avec Géolocalisation
 
-**Project:** Workshop 4 — Real-Time Waiting Room with Flutter & Supabase  
-**Student:** Iheb Najjar  
-**Class:** DSI 31  
-**AI Assistant:** Antigravity (Google DeepMind)  
-
----
-
-### Description of AI Usage:
-During this workshop, an AI coding assistant was used for standard pair-programming guidance, troubleshooting specific syntax errors, and resolving package configuration issues. The core logic, database setup, and feature implementations were guided by the workshop requirements.
-
-### Tasks the AI Assisted With:
-- **Dependency Troubleshooting:** Helping resolve package version conflicts in `pubspec.yaml` when adding `supabase_flutter` and `flutter_dotenv`.
-- **Asset Configuration:** Explaining how to register the `.env` file under the `assets:` section of `pubspec.yaml` so environment variables load properly.
-- **SQL / RLS Policy Syntax:** Providing standard PostgreSQL syntax for Row Level Security policies (`SELECT`, `INSERT`, `DELETE`) on the `clients` table.
-- **Defensive Parsing:** Assisting with handling null values safely inside `DateTime.parse()` in the `Client.fromMap()` model.
-- **Documentation Formatting:** Helping organize the project README and function explanations into clean Markdown.
+* **Étudiant** : Iheb Najjar
+* **Classe** : DSI 31
+* **Matière** : Développement Cross-Platform (Flutter)
+* **Outil d'IA utilisé** : Antigravity (Google DeepMind)
 
 ---
 
-### 5 Prompts Used During the Workshop:
+### Introduction
+Dans le cadre de l'Atelier 5, nous avons étendu l'application de salle d'attente (TP4) pour intégrer la persistance locale avec SQLite (`sqflite`), la capture de position GPS (`geolocator`), et la synchronisation non bloquante vers Supabase. L'intelligence artificielle a été sollicitée comme assistant technique pour surmonter des erreurs d'environnement de test, des dépréciations d'API et des problématiques d'architecture offline-first.
 
-1. *"How do I fix missing packages in pubspec.yaml when adding supabase_flutter and flutter_dotenv?"*
-2. *"Why does flutter_dotenv throw an asset error, and how do I declare the .env file in pubspec.yaml assets?"*
-3. *"What is the SQL syntax for Supabase RLS policies to allow anonymous users to insert and delete tickets?"*
-4. *"How can I safely parse created_at in Client.fromMap so it doesn't crash if the value is null?"*
-5. *"Help me organize and format the project README documentation for my TP4 submission."*
+---
+
+### Les 5 Prompts Soumis à l'IA
+
+#### Prompt 1 : Dépréciations et permissions de `geolocator`
+> *"Dans `GeolocationService`, `desiredAccuracy` et `timeLimit` sont marqués comme dépréciés dans la version 14.x de `geolocator`. Quelles sont les nouvelles classes recommandées, et comment configurer les permissions requises dans `AndroidManifest.xml` et `Info.plist` pour Android et iOS ?"*
+* **Apport de l'IA** : Proposition d'utiliser `locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 5))` et ajout des balises `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` ainsi que la clé iOS `NSLocationWhenInUseUsageDescription`.
+
+#### Prompt 2 : Isolation des bases de données SQLite en mémoire pendant les tests
+> *"Lors de l'exécution de `flutter test`, le deuxième test échoue avec un compte d'éléments inattendu car les données insérées dans le premier test restent présentes dans `:memory:`. Comment isoler les tests ou réinitialiser la table SQLite proprement ?"*
+* **Apport de l'IA** : Explication du comportement du cache partagé dans `sqflite_common_ffi` et implémentation d'une méthode `clear()` dans `LocalQueueService` appelée dans `setUp()` pour garantir que chaque test démarre avec une table vide.
+
+#### Prompt 3 : Erreur `Unsupported operation: read-only` sur les résultats SQLite
+> *"Quand je tente de trier directement le résultat retourné par `db.query()`, Flutter lève une exception `Unsupported operation: read-only`. Pourquoi et comment y remédier ?"*
+* **Apport de l'IA** : Identification que `db.query()` retourne une `QueryResultSet` immuable. Solution : cloner la liste via `List<Map<String, dynamic>>.from(localList)` avant d'appliquer `.sort()`.
+
+#### Prompt 4 : Architecture Offline-First et mise à jour optimiste de l'UI
+> *"Comment s'assurer que l'utilisateur voit son client immédiatement dans la file d'attente sans attendre la fin de la requête GPS ou l'insertion réseau Supabase ?"*
+* **Apport de l'IA** : Conception du pattern de mise à jour optimiste : ajout immédiat à la liste en mémoire avec notification des écouteurs (`notifyListeners()`), écriture asynchrone dans SQLite local, puis synchronisation distante non bloquante avec `unawaited(_syncLocalToRemote())`.
+
+#### Prompt 5 : Support multi-plateforme et compatibilité Web (Edge Browser)
+> *"Quand j'exécute l'application sur le navigateur Edge (`flutter run -d edge`), `sqflite` ne dispose pas de son driver C natif. Comment assurer un fallback sans faire planter l'application ?"*
+* **Apport de l'IA** : Utilisation de `kIsWeb` de `package:flutter/foundation.dart` dans `LocalQueueService` avec une liste de repli en mémoire (`_webFallback`), permettant une compatibilité totale sur Edge, Android, iOS et Windows.
+
+---
+
+### Bilan Personnel
+L'utilisation de l'IA m'a permis de mieux comprendre le cycle de vie asynchrone en Flutter, l'isolation des tests unitaires et widgets avec `sqflite_common_ffi`, ainsi que les bonnes pratiques de synchronisation offline-first sans bloquer l'expérience utilisateur.
