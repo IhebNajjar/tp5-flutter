@@ -98,6 +98,21 @@ class QueueProvider extends ChangeNotifier {
         }
       }
 
+
+      // Fetch remote records to reconcile and cache locally
+      try {
+        final remoteRows = await client
+            .from('clients')
+            .select()
+            .order('created_at', ascending: true);
+        for (final row in remoteRows) {
+          final item = Map<String, dynamic>.from(row);
+          item['is_synced'] = 1;
+          await _localDb.insertClientLocally(item);
+        }
+      } catch (e) {
+        debugPrint('Remote initial fetch skipped: $e');
+      }
       // Refresh UI if any sync succeeded
       final localList = await _localDb.getClients();
       final localMap = {for (var c in localList) c['id']: c};
