@@ -97,7 +97,7 @@ Manages SQLite persistence:
 * `markClientAsSynced(String id)`: Updates `is_synced = 1`.
 * `removeClientLocally(String id)`: Deletes record from SQLite.
 * `clear()`: Wipes the table (used for test teardowns).
-* `_webFallback`: Handles web execution (Edge/Chrome) seamlessly when native SQLite C-libraries are unavailable.
+* `_webFallback`: Handles web execution (Edge/Chrome) seamlessly with persistent browser storage (`SharedPreferences` / `localStorage`), guaranteeing that clients persist across browser reloads, shutdowns, and restarts without data loss.
 
 ### 3.3 `GeolocationService` (`lib/geolocation_service.dart`)
 Handles location detection:

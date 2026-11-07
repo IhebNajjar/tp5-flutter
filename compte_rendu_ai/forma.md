@@ -31,9 +31,9 @@ Dans le cadre de l'Atelier 5, nous avons étendu l'application de salle d'attent
 > *"Comment s'assurer que l'utilisateur voit son client immédiatement dans la file d'attente sans attendre la fin de la requête GPS ou l'insertion réseau Supabase ?"*
 * **Apport de l'IA** : Conception du pattern de mise à jour optimiste : ajout immédiat à la liste en mémoire avec notification des écouteurs (`notifyListeners()`), écriture asynchrone dans SQLite local, puis synchronisation distante non bloquante avec `unawaited(_syncLocalToRemote())`.
 
-#### Prompt 5 : Support multi-plateforme et compatibilité Web (Edge Browser)
-> *"Quand j'exécute l'application sur le navigateur Edge (`flutter run -d edge`), `sqflite` ne dispose pas de son driver C natif. Comment assurer un fallback sans faire planter l'application ?"*
-* **Apport de l'IA** : Utilisation de `kIsWeb` de `package:flutter/foundation.dart` dans `LocalQueueService` avec une liste de repli en mémoire (`_webFallback`), permettant une compatibilité totale sur Edge, Android, iOS et Windows.
+#### Prompt 5 : Support multi-plateforme, persistance Web (Edge) et redémarrage de l'application
+> *"Quand j'exécute l'application sur le navigateur Edge (`flutter run -d edge`), est-ce normal qu'après avoir ajouté des clients et fermé l'application, ils disparaissent au redémarrage ? Comment assurer une vraie persistance locale sur Web et Mobile sans driver C natif SQLite ?"*
+* **Apport de l'IA** : Explication de la différence entre SQLite natif (Android/iOS/Desktop) et l'environnement Web. Implémentation d'une persistance locale permanente dans `LocalQueueService` couplée à `shared_preferences` / `localStorage` pour le Web et réconciliation bidirectionnelle avec Supabase au démarrage, garantissant que les clients ne sont jamais perdus lors d'un redémarrage ou d'une déconnexion.
 
 ---
 
