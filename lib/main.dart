@@ -130,16 +130,27 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
                     itemCount: provider.clients.length,
                     itemBuilder: (context, index) {
                       final client = provider.clients[index];
-                      final dateFormatted = client.createdAt
-                          .toLocal()
-                          .toString()
-                          .split(' ')[0];
+                      final lat = client['lat'];
+                      final lng = client['lng'];
+                      final String locationText;
+                      if (lat == null || lng == null) {
+                        locationText = '📍 Location not captured';
+                      } else {
+                        final latNum = (lat is num) ? lat.toDouble() : double.tryParse(lat.toString());
+                        final lngNum = (lng is num) ? lng.toDouble() : double.tryParse(lng.toString());
+                        if (latNum != null && lngNum != null) {
+                          locationText = '📍 ${latNum.toStringAsFixed(4)}, ${lngNum.toStringAsFixed(4)}';
+                        } else {
+                          locationText = '📍 Location not captured';
+                        }
+                      }
+
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         child: ListTile(
-                          title: Text(client.name),
+                          title: Text(client['name']?.toString() ?? ''),
                           subtitle: Text(
-                            dateFormatted,
+                            locationText,
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.grey,
@@ -150,7 +161,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
                             onPressed: () {
                               context
                                   .read<QueueProvider>()
-                                  .removeClient(client.id);
+                                  .removeClient(client['id']?.toString() ?? '');
                             },
                           ),
                         ),

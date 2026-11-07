@@ -1,12 +1,18 @@
 class Client {
   final String id;
   final String name;
+  final double? lat;
+  final double? lng;
   final DateTime createdAt;
+  final int isSynced;
 
   Client({
     required this.id,
     required this.name,
+    this.lat,
+    this.lng,
     required this.createdAt,
+    this.isSynced = 0,
   });
 
   factory Client.fromMap(Map<String, dynamic> map) {
@@ -22,10 +28,16 @@ class Client {
       parsedDate = DateTime.now();
     }
 
+    final rawLat = map['lat'];
+    final rawLng = map['lng'];
+
     return Client(
       id: (map['id'] ?? '').toString(),
       name: (map['name'] ?? 'Unnamed').toString(),
+      lat: (rawLat is num) ? rawLat.toDouble() : double.tryParse(rawLat?.toString() ?? ''),
+      lng: (rawLng is num) ? rawLng.toDouble() : double.tryParse(rawLng?.toString() ?? ''),
       createdAt: parsedDate,
+      isSynced: (map['is_synced'] is num) ? (map['is_synced'] as num).toInt() : 0,
     );
   }
 
@@ -33,12 +45,16 @@ class Client {
     return {
       'id': id,
       'name': name,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
       'created_at': createdAt.toIso8601String(),
+      'is_synced': isSynced,
     };
   }
 
   @override
-  String toString() => 'Client(id: $id, name: $name, created_at: $createdAt)';
+  String toString() =>
+      'Client(id: $id, name: $name, lat: $lat, lng: $lng, created_at: $createdAt, is_synced: $isSynced)';
 
   @override
   bool operator ==(Object other) =>
