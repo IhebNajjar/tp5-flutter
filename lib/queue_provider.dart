@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'geolocation_service.dart';
@@ -11,7 +12,6 @@ class QueueProvider extends ChangeNotifier {
   final LocalQueueService _localDb;
   final GeolocationService _geoService;
   RealtimeChannel? _channel;
-  late final Future<void> initialization;
 
   List<Map<String, dynamic>> _clients = [];
   List<Map<String, dynamic>> get clients => List.unmodifiable(_clients);
@@ -23,7 +23,7 @@ class QueueProvider extends ChangeNotifier {
   })  : _supabase = supabase ?? _getSupabaseClientSafely(),
         _localDb = localDb ?? LocalQueueService(inMemory: _isTestMode),
         _geoService = geoService ?? GeolocationService() {
-    initialization = _loadQueue();
+    initialize();
   }
 
   @visibleForTesting
@@ -35,10 +35,11 @@ class QueueProvider extends ChangeNotifier {
         _localDb = localDb ?? LocalQueueService(inMemory: true),
         _geoService = geoService ?? GeolocationService(),
         super() {
-    initialization = _loadQueue();
+    initialize();
   }
 
   static bool get _isTestMode {
+    if (kIsWeb) return false;
     try {
       return Platform.environment.containsKey('FLUTTER_TEST');
     } catch (_) {
@@ -55,18 +56,26 @@ class QueueProvider extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
-    await initialization;
+    await _loadQueue();
   }
 
   Future<void> _loadQueue() async {
     // 1. Load from local DB immediately (offline support)
-    final localList = await _localDb.getClients();
-    _clients = List<Map<String, dynamic>>.from(localList);
-    _sortClients();
-    notifyListeners();
+    try {
+      final localList = await _localDb.getClients();
+      final localMap = {for (var c in localList) c['id']: c};
+      for (var c in _clients) {
+        localMap[c['id']] = c;
+      }
+      _clients = localMap.values.toList();
+      _sortClients();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Local queue load failed: $e');
+    }
 
-    // 2. Sync unsynced records to Supabase
-    await _syncLocalToRemote();
+    // 2. Sync unsynced records to Supabase (non-blocking)
+    unawaited(_syncLocalToRemote());
 
     // 3. Subscribe to real-time updates
     _setupRealtimeSubscription();
@@ -76,23 +85,31 @@ class QueueProvider extends ChangeNotifier {
     final client = _supabase;
     if (client == null) return;
 
-    final unsynced = await _localDb.getUnsyncedClients();
-    for (var item in unsynced) {
-      try {
-        final remoteClient = Map<String, dynamic>.from(item)
-          ..remove('is_synced');
-        await client.from('clients').upsert(remoteClient);
-        await _localDb.markClientAsSynced(item['id'] as String);
-      } catch (e) {
-        debugPrint('Sync failed for ${item['id']}: $e');
+    try {
+      final unsynced = await _localDb.getUnsyncedClients();
+      for (var item in unsynced) {
+        try {
+          final remoteClient = Map<String, dynamic>.from(item)
+            ..remove('is_synced');
+          await client.from('clients').upsert(remoteClient);
+          await _localDb.markClientAsSynced(item['id'] as String);
+        } catch (e) {
+          debugPrint('Sync failed for ${item['id']}: $e');
+        }
       }
-    }
 
-    // Refresh UI if any sync succeeded
-    final localList = await _localDb.getClients();
-    _clients = List<Map<String, dynamic>>.from(localList);
-    _sortClients();
-    notifyListeners();
+      // Refresh UI if any sync succeeded
+      final localList = await _localDb.getClients();
+      final localMap = {for (var c in localList) c['id']: c};
+      for (var c in _clients) {
+        localMap[c['id']] = c;
+      }
+      _clients = localMap.values.toList();
+      _sortClients();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Remote sync loop error: $e');
+    }
   }
 
   void _setupRealtimeSubscription() {
@@ -138,11 +155,16 @@ class QueueProvider extends ChangeNotifier {
   }
 
   Future<void> addClient(String name) async {
-    await initialization;
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
 
-    final position = await _geoService.getCurrentPosition();
+    Position? position;
+    try {
+      position = await _geoService.getCurrentPosition();
+    } catch (e) {
+      debugPrint('Geolocation capture failed: $e');
+    }
+
     final newClient = <String, dynamic>{
       'id': const Uuid().v4(),
       'name': trimmed,
@@ -152,7 +174,7 @@ class QueueProvider extends ChangeNotifier {
       'is_synced': 0,
     };
 
-    // Optimistic UI update: update in-memory list immediately
+    // Update UI instantly
     _clients.add(newClient);
     _sortClients();
     notifyListeners();
@@ -165,7 +187,6 @@ class QueueProvider extends ChangeNotifier {
   }
 
   Future<void> removeClient(String id) async {
-    await initialization;
     _clients.removeWhere((c) => c['id'] == id);
     notifyListeners();
 
@@ -182,7 +203,6 @@ class QueueProvider extends ChangeNotifier {
   }
 
   Future<void> nextClient() async {
-    await initialization;
     if (_clients.isEmpty) return;
     final first = _clients.first;
     await removeClient(first['id'] as String);
